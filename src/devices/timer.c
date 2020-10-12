@@ -20,12 +20,11 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-/* ANS: List for sleep threads */
-static struct list sleep_threads_list;
-
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
+
+static struct list threads_sleep_list;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops(unsigned loops);
@@ -39,7 +38,7 @@ void timer_init(void)
 {
   pit_configure_channel(0, 2, TIMER_FREQ);
   intr_register_ext(0x20, timer_interrupt, "8254 Timer");
-  list_init(&sleep_threads_list);
+  list_init(&threads_sleep_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -92,18 +91,10 @@ void timer_sleep(int64_t ticks)
 {
   int64_t start = timer_ticks();
 
-  /* ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield (); */
-
   ASSERT(intr_get_level() == INTR_ON);
-  if (ticks <= 0)
-  {
-    return;
-  }
   enum intr_level old_level = intr_disable();
-  thread_current()->ticks_to_wake_up = start + ticks;
-  list_push_back(&sleep_threads_list, &thread_current()->elem);
+  thread_current()->time_stop_sleep = start + ticks;
+  list_insert_ordered(&threads_sleep_list, &thread_current()->elem, (list_less_func *)priority_comp, NULL);
   thread_block();
   intr_set_level(old_level);
   return;
@@ -180,11 +171,11 @@ timer_interrupt(struct intr_frame *args UNUSED)
   thread_tick();
 
   /* ANS: Query through list to wake up thread */
-  for (struct list_elem *iter = list_begin(&sleep_threads_list);iter != list_end(&sleep_threads_list);/* iter = list_next(iter) */)
+  for (struct list_elem *iter = list_begin(&threads_sleep_list);iter != list_end(&threads_sleep_list);/* iter = list_next(iter) */)
   {
     //do stuff with iter
     struct thread *t = list_entry(iter, struct thread, elem);
-    if(ticks >= t->ticks_to_wake_up)
+    if(ticks >= t->time_stop_sleep)
     {
       iter = list_remove(iter);
       thread_unblock(t);
@@ -195,6 +186,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
     }
     
   }
+  
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

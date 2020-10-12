@@ -71,6 +71,59 @@ static void schedule(void);
 void thread_schedule_tail(struct thread *prev);
 static tid_t allocate_tid(void);
 
+void try_donate_priority()
+{
+  enum intr_level old_level = intr_disable();
+  struct thread *donor = thread_current();
+  struct lock *l = donor->lock_wanted;
+
+  for (int i = 0; i < 8; i++)
+  {
+    if (l == NULL || l->holder == NULL)
+      return;
+    if (donor->priority > l->holder->priority)
+    {
+      l->holder->priority = donor->priority;
+      donor = l->holder;
+      l = donor->lock_wanted;
+    }
+    else
+      return;
+  }
+  intr_set_level(old_level);
+}
+void check_priority_to_be_donated()
+{
+  if (!list_empty(&thread_current()->threads_want_lock))
+  {
+    struct thread *t = list_entry(list_front(&thread_current()->threads_want_lock), struct thread, twl_elem);
+    if(t->priority>thread_current()->priority)
+    {
+      thread_current()->priority=t->priority;
+    }
+  }
+}
+bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+  return t_a->priority > t_b->priority;
+}
+
+void check_if_yield()
+{
+  enum intr_level old_level = intr_disable();
+  if (!list_empty(&ready_list))
+  {
+    list_sort(&ready_list, (list_less_func *)priority_comp, NULL);
+    struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
+    if (thread_current()->priority < t->priority)
+    {
+      thread_yield();
+    }
+  }
+  intr_set_level(old_level);
+}
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -195,7 +248,7 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
-  check_for_yield();
+  check_if_yield();
   return tid;
 }
 
@@ -230,7 +283,7 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, (list_less_func *)&priority_comp, NULL);
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func *)priority_comp, NULL);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -298,8 +351,8 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    // list_push_back(&ready_list, &cur->elem);
     list_insert_ordered(&ready_list, &cur->elem, (list_less_func *)priority_comp, NULL);
+  //list_sort(&ready_list, (list_less_func *) priority_comp, NULL);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -325,39 +378,17 @@ void thread_foreach(thread_action_func *func, void *aux)
 void thread_set_priority(int new_priority)
 {
   enum intr_level old_level = intr_disable();
-  struct thread *cur = thread_current();
-  //int old_old_priority = thread_current()->priority;
   thread_current()->priority = new_priority;
   thread_current()->old_priority = new_priority;
-  if (!list_empty(&cur->threads_want_its_lock_list))
-  {
-    list_sort(&cur->threads_want_its_lock_list, (list_less_func *)priority_comp, NULL);
-    struct thread *t = list_entry(list_front(&cur->threads_want_its_lock_list), struct thread, TL_elem);
-    if (t->priority > cur->priority)
-    {
-      cur->priority = t->priority;
-    }
-  }
-  if (!list_empty(&ready_list))
-  {
-    list_sort(&ready_list, (list_less_func *)priority_comp, NULL);
-    struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
-    if (thread_current()->priority < t->priority)
-    {
-      thread_yield();
-    }
-  }
-
+  check_priority_to_be_donated();
+  check_if_yield();
   intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
 int thread_get_priority(void)
 {
-  enum intr_level old_level = intr_disable();
-  int ret = thread_current()->priority;
-  intr_set_level(old_level);
-  return ret;
+  return thread_current()->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -477,14 +508,14 @@ init_thread(struct thread *t, const char *name, int priority)
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *)t + PGSIZE;
   t->priority = priority;
+  t->old_priority = priority;
+  list_init(&t->threads_want_lock);
+  t->lock_wanted = NULL;
+  //t->time_stop_sleep=NULL;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
-
-  t->old_priority = priority;
-  t->lock_to_get = NULL;
-  list_init(&t->threads_want_its_lock_list);
   intr_set_level(old_level);
 }
 
@@ -597,51 +628,6 @@ allocate_tid(void)
   return tid;
 }
 
-void try_donate_priority(void)
-{
-  struct thread *to_donate = thread_current();
-  struct lock *l = to_donate->lock_to_get;
-  /* LT 8 is the max depth for nested donation */
-  /* If it is not nested the loop will return when i = 1 */
-  for (int i = 0; i < 8; i++)
-  {
-    if (l == NULL)
-      return;
-    if (l->holder == NULL)
-      return;
-    if (l->holder->priority < thread_current()->priority)
-    {
-      l->holder->priority = thread_current()->priority;
-      to_donate = l->holder;
-      l = to_donate->lock_to_get;
-    }
-    else
-      return;
-  }
-}
-
-bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-  struct thread *t_a = list_entry(a, struct thread, elem);
-  struct thread *t_b = list_entry(b, struct thread, elem);
-  
-  return t_a->priority > t_b->priority;
-}
-
-void check_for_yield(void)
-{
-  enum intr_level old_level = intr_disable();
-  if (!list_empty(&ready_list))
-  {
-    list_sort(&ready_list, (list_less_func *)priority_comp, NULL);
-    struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
-    if (thread_current()->priority < t->priority)
-    {
-      thread_yield();
-    }
-  }
-  intr_set_level(old_level);
-}
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(struct thread, stack);
