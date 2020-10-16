@@ -10,7 +10,7 @@
 谭衡捷 78216002
 
 ---- GROUP CONTRIBUTION PERCENTAGES ----
-谭衡捷 100%
+谭衡捷 78216002 100%
 
 ---- TEST CASE PASS AND FAIL ----
 20 out of 27 test case passws.
