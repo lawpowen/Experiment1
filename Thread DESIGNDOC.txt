@@ -1,0 +1,172 @@
+      +--------------------+
+      |        CS 140      |
+      | PROJECT 1: THREADS |
+      |   DESIGN DOCUMENT  |
+      +--------------------+
+
+           
+---- GROUP ----
+
+谭衡捷 78216002
+
+---- GROUP CONTRIBUTION PERCENTAGES ----
+谭衡捷 100%
+
+---- TEST CASE PASS AND FAIL ----
+20 out of 27 test case passws.
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for
+>> the TAs, or extra credit, please give them here.
+(This is a sample design document.)
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, and lecture notes.
+None.
+
+
+	      Alarm			Coded and written by: 谭衡捷 78216002
+	      =====
+
+---- DATA STRUCTURES ----
+
+>> Copy here the declaration of each new or changed `struct' or `struct'
+>> member, global or static variable, `typedef', or enumeration.
+>> Identify the purpose of each in 25 words or less.
+
+Added to struct thread
+/* Member for implementing alarm */
+	int64_t time_stop_sleep;		/* To specify what tick to wake up (unblock) */
+	
+Added to timer.c
+/* List for storing sleeping threads */
+	struct list threads_sleep_list;
+
+---- ALGORITHMS ----
+
+>> Briefly describe timer_sleep() and timer_interrupt()
+
+Timer_sleep() makes the thread sleep for a specified number of ticks. First,we disabled 
+the interrupts to prevent ticks from adding in. Then, we record the ticks towake up into
+time_stop_sleep and pushing the thread in ordered into threads_sleep_list in timer.c.
+Each time timer_interrupt() occurs, we check the threads_sleep_list by looping and see 
+which threadshoud wake up by comparing time_stop_sleep to ticks and if threads' time_stop_sleep 
+is greater then tick it will break the loop. If a thread wake up it will be remove from 
+thethreads_sleep_list.
+
+---- SYNCHRONIZATION ----
+
+>> How do you ensure proper synchronization and avoid race conditions while multiple threads
+>> call timer_sleep() at the same time?
+
+We will ensure proper synchronization by disabling interrupts so that no other threads can
+call the function until the first thread has finished.
+
+
+---- RATIONALE ----
+
+>> Critique your design, pointing out advantages and disadvantages in
+>> your design choices.
+
+We chose this design is because timer_interrupt() will eventually occurs every tick. So
+we check the threads_sleep_list with every timer_interrupt(). We use a sorted list for our
+sleeping threads so it will be more responsive comparing to unsorted list. Since timer_interrupt()
+require a fast execute time.
+
+       PRIORITY SCHEDULING 				Coded and written by: 谭衡捷 78216002
+	   ===================
+
+---- DATA STRUCTURES ----
+
+>> Copy here the declaration of each new or changed `struct' or `struct'
+>> member, global or static variable, `typedef', or enumeration.  Identify the
+>> purpose of each in 25 words or less.
+
+Things added to struct thread
+/* Memvber for implementing priority donation */
+	struct lock *lock_wanted;		/* To specify which lock does the thread wanted */
+    struct list threads_want_lock;	/* To specify threads that want its lock (to specify donors) */
+    struct list_elem twl_elem;		/* list_elem for list threads_want_lock */
+    int old_priority;				/* Save the old priority for reverting the donations */
+
+
+---- ALGORITHMS ----
+
+>> Briefly describe your implementation for ensuring the highest priority thread wake
+>> up while wait for lock, semaphore and condition.
+
+While a thread want a lock and the lock is acquired by other thread, it will be push orderly
+into the lock's holder threads_want_lock list, this step can be done bu many other threads.
+If the holder thread release its lock, all the threads that want the lock will be remove from
+threads_want_lock list and its priority will be reverted to before donation. then, sema_down()
+was called and it will look for the highest priority thread to acquire the lock.
+
+Semaphore is a simplier lock. sema_down() will push threads that can't down the semaphore orderly 
+into waiters list. when sema_up() is called, it will up the semaphore and get the highest priority
+thread to operate.
+
+For condition variables, in cond_signal(), we call sema_up() on the waiting
+thread in the list of condition variable waiters with the highest priority. We
+use the same function as just described to compute each threads priority.
+
+Since all list except condition we create are descending order so the highest priority thread can
+be found easily. For condition, we do a list_sort() for every cond_signal() because we don't have
+its comparator.
+
+>> Briefly describe your implementation of priority donation like chain, nested, multiple etc.
+
+Each time a thread A tries to acquire a lock that help by anothe thread, we push the thread into
+the lock holder threads_want_lock list by comparing priority in descending order. Thread A will
+then calls sema_down, within the sema_down it will call try_to_donate(0 to donate its priority to
+the lock holder. When the lock holder finished and release its lock, the lock holder will remove all
+the thread that want this lock from threads_want_lock list and Thread A can get the lock. This method
+worksfor one or multiple lock on a thread. For multiple lock, when lock_release it will also call 
+check_priority_to_be_donated() to check threads_want_lock list is empty, if not the will continue be donated.
+
+Most important part is whenever a thread set its priority it will call check_if_yield() to ensure
+the highest priority thread is operating.
+
+For nested and chain, we set the max depth of nested donation to 8 and do a 8 times loop. In try_to_donate(),
+the loop will eventually find the deepest or 8 level depth lock holder and donate ptiority to it.
+
+
+>> Briefly describe your implementation for ensuring the highest priority thread is always operating.
+
+Whenever a thread change or set its priority, check_if_yield() will be call and check if the thread should yield.
+
+---- SYNCHRONIZATION ----
+
+>> How do you ensure proper synchronization and avoid race conditions in thread_set_priority?
+
+Whenever a thread calls thread_set_priority and before returning, check_if_yield() will be call to ensure the highest
+priority thread is running. Inside check_if_yield(), the interrupts has been disabled to avoid desynchronized such as
+another thread is writting ready_list while check_if_yield() is called.
+
+---- RATIONALE ----
+
+>> Critique your design, pointing out advantages and disadvantages in
+>> your design choices.
+
+We chose this design because of its simpleness and work very well. this design is all about sorted list that can
+get the highest priority thread easily by using list_front(). Since all the list is sorted, it will be much quicker
+to access the content instead of keep loopoing through list, it will save up much more CPU compute time. Since it is
+simplier design, it will be hard to add more funcionality to the design without having a big big update or patch to
+the code.Since it is just homework, this code will suffice the needs.
+
+
+        ADVANCED SCHEDULER
+		==================
+
+---- DATA STRUCTURES ----
+
+
+---- ALGORITHMS ----
+
+
+---- RATIONALE ----
+
+
+
+        

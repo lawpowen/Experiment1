@@ -85,6 +85,13 @@ timer_elapsed(int64_t then)
   return timer_ticks() - then;
 }
 
+bool time_stop_sleep_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a = list_entry(a, struct thread, elem);
+  struct thread *t_b = list_entry(b, struct thread, elem);
+  return t_a->time_stop_sleep > t_b->time_stop_sleep;
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void timer_sleep(int64_t ticks)
@@ -93,8 +100,12 @@ void timer_sleep(int64_t ticks)
 
   ASSERT(intr_get_level() == INTR_ON);
   enum intr_level old_level = intr_disable();
+  if(ticks <= 0){
+    intr_set_level(old_level);
+    return;
+  }
   thread_current()->time_stop_sleep = start + ticks;
-  list_insert_ordered(&threads_sleep_list, &thread_current()->elem, (list_less_func *)priority_comp, NULL);
+  list_insert_ordered(&threads_sleep_list, &thread_current()->elem, (list_less_func *)time_stop_sleep_comp, NULL);
   thread_block();
   intr_set_level(old_level);
   return;
@@ -175,10 +186,14 @@ timer_interrupt(struct intr_frame *args UNUSED)
   {
     //do stuff with iter
     struct thread *t = list_entry(iter, struct thread, elem);
-    if(ticks >= t->time_stop_sleep)
+    if(ticks == t->time_stop_sleep)
     {
       iter = list_remove(iter);
       thread_unblock(t);
+    }
+    else if(ticks > t->time_stop_sleep)
+    {
+      break;
     }
     else
     {

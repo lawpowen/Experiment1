@@ -91,7 +91,7 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t time_stop_sleep;
+    int64_t time_stop_sleep;     
     struct lock *lock_wanted;
     struct list threads_want_lock;
     struct list_elem twl_elem;
