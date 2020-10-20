@@ -99,7 +99,7 @@ struct thread
     int old_priority;
     
     int nice;
-    fixed_t recent_cpu;
+    int recent_cpu;
 
 
 #ifdef USERPROG

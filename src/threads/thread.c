@@ -646,7 +646,7 @@ mlfqs_increase_recent_cpu_by_1 (void)
 	struct thread *current_thread = thread_current ();
 	if (current_thread == idle_thread)
 		return ;
-	current_thread->recent_cpu = FP_ADD_MIX (curent_thread->recent_cpu, 1);
+	current_thread->recent_cpu = FP_ADD_MIX (current_thread->recent_cpu, 1);
 }
 
 
@@ -659,8 +659,8 @@ mlfqs_update_load_avg_and_recent_cpu (void)
 	
 	size_t ready_thread = list_size (&ready_list);
 	if (thread_current () != idle_thread)
-		ready+threads++;
-	load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST(ready_threads), 60));
+		ready_thread++;
+	load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX (FP_CONST(ready_thread), 60));
 	
 	struct thread *t;
 	struct list_elem *e = list_begin (&all_list);
