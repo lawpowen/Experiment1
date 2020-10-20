@@ -180,7 +180,15 @@ timer_interrupt(struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick();
-
+  
+  if (thread_mlfqs)
+  {
+  	mlfqs_increase_recent_cpu_by_1 ();
+  	if (ticks % TIMER_FREQ == 0)
+  	  mlfqs_update_load_avg_and_recent_cpu ();
+	else if (ticks % 4 == 0)
+	  thread_mlfqs_update_priority (thread_current ());
+  }
   /* ANS: Query through list to wake up thread */
   for (struct list_elem *iter = list_begin(&threads_sleep_list);iter != list_end(&threads_sleep_list);/* iter = list_next(iter) */)
   {

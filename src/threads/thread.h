@@ -96,6 +96,9 @@ struct thread
     struct list threads_want_lock;
     struct list_elem twl_elem;
     int old_priority;
+    
+    int nice;
+    fixed_t recent_cpu;
 
 
 #ifdef USERPROG
@@ -145,5 +148,8 @@ int thread_get_load_avg (void);
 bool priority_comp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void try_donate_priority();
 void check_priority_to_be_donated();
+void mlfqs_increase_recent_cpu_by_1 (void);
+void mlfqs_update_load_avg_and_recent_cpu (void);
+void mlfqs_update_priority (struct thread *t);
 
 #endif /* threads/thread.h */
