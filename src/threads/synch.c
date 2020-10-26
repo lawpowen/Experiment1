@@ -67,7 +67,22 @@ void sema_down(struct semaphore *sema)
   old_level = intr_disable();
   while (sema->value == 0)
   {
-    try_donate_priority();
+    struct thread *donor = thread_current();
+    struct lock *l = donor->lock_wanted;
+
+    for (int i = 0; i < 8; i++)
+    {
+      if (l == NULL || l->holder == NULL)
+        break;
+      if (donor->priority > l->holder->priority)
+      {
+        l->holder->priority = donor->priority;
+        donor = l->holder;
+        l = donor->lock_wanted;
+      }
+      else
+        break;
+    }
     list_insert_ordered(&sema->waiters, &thread_current()->elem, (list_less_func *)priority_comp, NULL);
     thread_block();
   }
@@ -346,7 +361,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 
   if (!list_empty(&cond->waiters))
   {
-    list_sort(&cond->waiters, (list_less_func *) cond_priority_comp, NULL);
+    list_sort(&cond->waiters, (list_less_func *)cond_priority_comp, NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters), struct semaphore_elem, elem)->semaphore);
   }
 }

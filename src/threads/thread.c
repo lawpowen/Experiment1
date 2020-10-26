@@ -73,27 +73,7 @@ void thread_schedule_tail(struct thread *prev);
 static tid_t allocate_tid(void);
 fixed_t load_avg; 
 
-void try_donate_priority()
-{
-  enum intr_level old_level = intr_disable();
-  struct thread *donor = thread_current();
-  struct lock *l = donor->lock_wanted;
 
-  for (int i = 0; i < 8; i++)
-  {
-    if (l == NULL || l->holder == NULL)
-      return;
-    if (donor->priority > l->holder->priority)
-    {
-      l->holder->priority = donor->priority;
-      donor = l->holder;
-      l = donor->lock_wanted;
-    }
-    else
-      return;
-  }
-  intr_set_level(old_level);
-}
 void check_priority_to_be_donated()
 {
   if (!list_empty(&thread_current()->threads_want_lock))
