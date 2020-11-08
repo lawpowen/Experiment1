@@ -8,12 +8,18 @@
 ---- GROUP ----
 
 谭衡捷 78216002
+刘博文 78066008
+金真率 78076003
+全成浩 78056014
 
 ---- GROUP CONTRIBUTION PERCENTAGES ----
-谭衡捷 78216002 100%
+谭衡捷 78216002 50%
+刘博文 78066008 30%
+全成浩 78056014 20%
+
 
 ---- TEST CASE PASS AND FAIL ----
-20 out of 27 test case passws.
+23 out of 27 test case passed.
 
 ---- PRELIMINARIES ----
 
@@ -76,6 +82,7 @@ sleeping threads so it will be more responsive comparing to unsorted list. Since
 require a fast execute time.
 
        PRIORITY SCHEDULING 				Coded and written by: 谭衡捷 78216002
+									      全成浩 78056014
 	   ===================
 
 ---- DATA STRUCTURES ----
@@ -85,7 +92,7 @@ require a fast execute time.
 >> purpose of each in 25 words or less.
 
 Things added to struct thread
-/* Memvber for implementing priority donation */
+/* Member for implementing priority donation */
 	struct lock *lock_wanted;		/* To specify which lock does the thread wanted */
     struct list threads_want_lock;	/* To specify threads that want its lock (to specify donors) */
     struct list_elem twl_elem;		/* list_elem for list threads_want_lock */
@@ -156,17 +163,40 @@ simplier design, it will be hard to add more funcionality to the design without 
 the code.Since it is just homework, this code will suffice the needs.
 
 
-        ADVANCED SCHEDULER
+        ADVANCED SCHEDULER				Coded and written by: 刘博文 78066008
 		==================
 
 ---- DATA STRUCTURES ----
+Added float_point.h:
+Floating point arithmetic logic implementation,Fixed point numbers are in signed p : q format, 
+where p + q = 31, and FP_SHIFT_AMOUNT is 1 << q.16 LSB used for fractional part. 
+  
+Added to struct thread:
+    int nice;		//Niceness.
+    int recent_cpu;	//recent CPU.
+
+Added global value at thread.c:
+    int load_avg
+
+Added to init_thread():
+    t->nice = 0;
+    t->recent_cpu = convert_to_fixed_point(0);
+//init both new added variable
+
+Added to thread_start():
+    load_avg = convert_to_fixed_point(0);
 
 
 ---- ALGORITHMS ----
-
+In timer_interrupt():
+To use multi-level feedback queue scheduler.
+Firstly,increase recent_cpu by 1(mlfqs_increase_recent_cpu_by_1()).
+If ticks can be divided by TIMER_FREQ and remainder is 0,refresh load_avg and recent_cpu of all threads every second.
+(mlfqs_update_load_avg_and_recent_cpu()).Else if ticks can be divided by 4 and remained is 0,update the priority os 
+current thread(mlfqs_update_priority()).
 
 ---- RATIONALE ----
 
-
-
-        
+This is the most easier way that we are know.Write a float_point.h and use what inside it make code more easier to 
+understand.Read and understand the pintos requirement and the Appendix.The code is designed around the description 
+of the pintos document, this make the code is clearly show how the advanced scheduler works.
